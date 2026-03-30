@@ -75,4 +75,3 @@ Direct audio links are the most reliable for autoplay. Some browsers may block a
 ## Notes
 
 - YouTube playback depends on browser and embed restrictions.
-- The repository still contains Gradle/IntelliJ workspace files, but the product itself is a frontend app powered by Vite.
