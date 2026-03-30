@@ -1,10 +1,10 @@
-# Fullscreen Timer Player
+# ScreenCue Timer
 
-A React + Vite web app for running a fullscreen countdown timer and triggering a song when the timer completes.
+A React + Vite web app for running an immersive fullscreen countdown timer and triggering a song when the timer completes.
 
 ## Features
 
-- Fullscreen-style countdown experience with a large timer display
+- Fullscreen countdown experience with a large timer display
 - Timer setup for hours, minutes, and seconds
 - Song link input during setup
 - Support for direct media URLs and YouTube links
@@ -75,4 +75,4 @@ Direct audio links are the most reliable for autoplay. Some browsers may block a
 ## Notes
 
 - YouTube playback depends on browser and embed restrictions.
-- This repository also contains Gradle/IntelliJ files from the surrounding workspace, but the timer app itself is a frontend project powered by Vite.
+- The repository still contains Gradle/IntelliJ workspace files, but the product itself is a frontend app powered by Vite.

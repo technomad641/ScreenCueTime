@@ -1,1 +1,1 @@
-rootProject.name = "TestingIntelliJIDEA"
+rootProject.name = "ScreenCueTimer"

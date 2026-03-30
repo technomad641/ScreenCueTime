@@ -1,6 +1,21 @@
 import React, { useEffect, useRef, useState } from "react";
 
-const DEFAULT_FORM = {
+const APP_COPY = {
+  idleHeadline: "Time left",
+  finishedHeadline: "Time is up",
+  idleNote: "Keep this tab open for playback.",
+  youtubeFinishedNote: "Timer complete. Embedded player started.",
+  directFinishedNote: "Timer complete. Playing your song.",
+  manualPlaybackNote: "Timer complete, but autoplay was blocked. Press play in the browser.",
+};
+
+const TIMER_PHASE = {
+  IDLE: "idle",
+  RUNNING: "running",
+  FINISHED: "finished",
+};
+
+const INITIAL_TIMER_FORM = {
   hours: "0",
   minutes: "5",
   seconds: "0",
@@ -49,50 +64,51 @@ function formatTime(msRemaining) {
 }
 
 function App() {
-  const [form, setForm] = useState(DEFAULT_FORM);
-  const [deadline, setDeadline] = useState(null);
-  const [timeLeft, setTimeLeft] = useState("00:00:00");
-  const [status, setStatus] = useState("");
-  const [countdownLabel, setCountdownLabel] = useState("Time left");
-  const [countdownNote, setCountdownNote] = useState("Keep this tab open for playback.");
-  const [isRunning, setIsRunning] = useState(false);
-  const [mediaConfig, setMediaConfig] = useState(null);
-  const [showAudioControls, setShowAudioControls] = useState(false);
+  const [timerForm, setTimerForm] = useState(INITIAL_TIMER_FORM);
+  const [targetTimeMs, setTargetTimeMs] = useState(null);
+  const [displayTime, setDisplayTime] = useState("00:00:00");
+  const [validationMessage, setValidationMessage] = useState("");
+  const [screenHeadline, setScreenHeadline] = useState(APP_COPY.idleHeadline);
+  const [screenNote, setScreenNote] = useState(APP_COPY.idleNote);
+  const [timerPhase, setTimerPhase] = useState(TIMER_PHASE.IDLE);
+  const [playbackSource, setPlaybackSource] = useState(null);
+  const [showManualAudioControls, setShowManualAudioControls] = useState(false);
   const audioRef = useRef(null);
+  const isTimerActive = timerPhase === TIMER_PHASE.RUNNING;
+  const isTimerFinished = timerPhase === TIMER_PHASE.FINISHED;
+  const shouldShowSetup = timerPhase === TIMER_PHASE.IDLE;
+  const shouldShowCountdown = timerPhase !== TIMER_PHASE.IDLE;
+  const shouldRenderYouTubePlayer = isTimerFinished && playbackSource?.type === "youtube";
 
   useEffect(() => {
-    if (!deadline) {
+    if (timerPhase !== TIMER_PHASE.RUNNING || !targetTimeMs) {
       return undefined;
     }
 
     const intervalId = window.setInterval(() => {
-      const remaining = deadline - Date.now();
-      setTimeLeft(formatTime(remaining));
+      const remainingMs = targetTimeMs - Date.now();
+      setDisplayTime(formatTime(remainingMs));
 
-      if (remaining > 0) {
+      if (remainingMs > 0) {
         return;
       }
 
       window.clearInterval(intervalId);
-      setTimeLeft("00:00:00");
-      setCountdownLabel("Time is up");
-      setIsRunning(false);
+      setDisplayTime("00:00:00");
+      setScreenHeadline(APP_COPY.finishedHeadline);
+      setTimerPhase(TIMER_PHASE.FINISHED);
     }, 250);
 
     return () => window.clearInterval(intervalId);
-  }, [deadline]);
+  }, [targetTimeMs, timerPhase]);
 
   useEffect(() => {
-    if (isRunning || !mediaConfig || deadline === null) {
+    if (timerPhase !== TIMER_PHASE.FINISHED || !playbackSource) {
       return;
     }
 
-    if (deadline > Date.now()) {
-      return;
-    }
-
-    if (mediaConfig.type === "youtube") {
-      setCountdownNote("Timer complete. Embedded player started.");
+    if (playbackSource.type === "youtube") {
+      setScreenNote(APP_COPY.youtubeFinishedNote);
       return;
     }
 
@@ -101,16 +117,16 @@ function App() {
       return;
     }
 
-    audio.src = mediaConfig.src;
+    audio.src = playbackSource.src;
     audio.play()
       .then(() => {
-        setCountdownNote("Timer complete. Playing your song.");
+        setScreenNote(APP_COPY.directFinishedNote);
       })
       .catch(() => {
-        setShowAudioControls(true);
-        setCountdownNote("Timer complete, but autoplay was blocked. Press play in the browser.");
+        setShowManualAudioControls(true);
+        setScreenNote(APP_COPY.manualPlaybackNote);
       });
-  }, [deadline, isRunning, mediaConfig]);
+  }, [playbackSource, timerPhase]);
 
   function stopPlayback() {
     const audio = audioRef.current;
@@ -119,114 +135,112 @@ function App() {
       audio.removeAttribute("src");
       audio.load();
     }
-    setShowAudioControls(false);
+    setShowManualAudioControls(false);
   }
 
   function handleChange(event) {
     const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+    setTimerForm((currentForm) => ({ ...currentForm, [name]: value }));
   }
 
   function resetTimer() {
     stopPlayback();
-    setForm(DEFAULT_FORM);
-    setDeadline(null);
-    setTimeLeft("00:00:00");
-    setStatus("");
-    setCountdownLabel("Time left");
-    setCountdownNote("Keep this tab open for playback.");
-    setIsRunning(false);
-    setMediaConfig(null);
+    setTimerForm(INITIAL_TIMER_FORM);
+    setTargetTimeMs(null);
+    setDisplayTime("00:00:00");
+    setValidationMessage("");
+    setScreenHeadline(APP_COPY.idleHeadline);
+    setScreenNote(APP_COPY.idleNote);
+    setTimerPhase(TIMER_PHASE.IDLE);
+    setPlaybackSource(null);
   }
 
   function handleSubmit(event) {
     event.preventDefault();
 
-    const hours = Number.parseInt(form.hours || "0", 10);
-    const minutes = Number.parseInt(form.minutes || "0", 10);
-    const seconds = Number.parseInt(form.seconds || "0", 10);
+    const hours = Number.parseInt(timerForm.hours || "0", 10);
+    const minutes = Number.parseInt(timerForm.minutes || "0", 10);
+    const seconds = Number.parseInt(timerForm.seconds || "0", 10);
     const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
 
     if (totalSeconds <= 0) {
-      setStatus("Enter a timer greater than zero.");
+      setValidationMessage("Enter a timer greater than zero.");
       return;
     }
 
-    const nextMediaConfig = classifySongLink(form.songLink.trim());
-    if (!nextMediaConfig) {
-      setStatus("Enter a valid direct media URL or YouTube link.");
+    const resolvedPlaybackSource = classifySongLink(timerForm.songLink.trim());
+    if (!resolvedPlaybackSource) {
+      setValidationMessage("Enter a valid direct media URL or YouTube link.");
       return;
     }
 
     stopPlayback();
-    const nextDeadline = Date.now() + (totalSeconds * 1000);
-    setStatus("");
-    setMediaConfig(nextMediaConfig);
-    setDeadline(nextDeadline);
-    setTimeLeft(formatTime(totalSeconds * 1000));
-    setCountdownLabel("Time left");
-    setCountdownNote("Keep this tab open for playback.");
-    setIsRunning(true);
+    const nextTargetTimeMs = Date.now() + (totalSeconds * 1000);
+    setValidationMessage("");
+    setPlaybackSource(resolvedPlaybackSource);
+    setTargetTimeMs(nextTargetTimeMs);
+    setDisplayTime(formatTime(totalSeconds * 1000));
+    setScreenHeadline(APP_COPY.idleHeadline);
+    setScreenNote(APP_COPY.idleNote);
+    setTimerPhase(TIMER_PHASE.RUNNING);
   }
-
-  const youtubeIsActive = !isRunning && mediaConfig?.type === "youtube" && deadline !== null && deadline <= Date.now();
 
   return (
     <main className="app-shell">
-      {!isRunning && (!mediaConfig || countdownLabel === "Time left") && (
+      {shouldShowSetup && (
         <section className="setup-card">
           <p className="eyebrow">Timer Setup</p>
           <h1>Fill the screen with a countdown, then trigger your song.</h1>
           <form className="timer-form" onSubmit={handleSubmit}>
             <label className="field">
               <span>Hours</span>
-              <input type="number" name="hours" min="0" max="23" value={form.hours} onChange={handleChange} inputMode="numeric" />
+              <input type="number" name="hours" min="0" max="23" value={timerForm.hours} onChange={handleChange} inputMode="numeric" />
             </label>
             <label className="field">
               <span>Minutes</span>
-              <input type="number" name="minutes" min="0" max="59" value={form.minutes} onChange={handleChange} inputMode="numeric" />
+              <input type="number" name="minutes" min="0" max="59" value={timerForm.minutes} onChange={handleChange} inputMode="numeric" />
             </label>
             <label className="field">
               <span>Seconds</span>
-              <input type="number" name="seconds" min="0" max="59" value={form.seconds} onChange={handleChange} inputMode="numeric" />
+              <input type="number" name="seconds" min="0" max="59" value={timerForm.seconds} onChange={handleChange} inputMode="numeric" />
             </label>
             <label className="field field-wide">
               <span>Song Link</span>
               <input
                 type="url"
                 name="songLink"
-                value={form.songLink}
+                value={timerForm.songLink}
                 onChange={handleChange}
                 placeholder="https://example.com/song.mp3 or https://www.youtube.com/watch?v=..."
                 required
               />
             </label>
             <p className="hint">Direct audio/video URLs work best. YouTube links are supported in the embedded player.</p>
-            <p className="form-status" aria-live="polite">{status}</p>
+            <p className="form-status" aria-live="polite">{validationMessage}</p>
             <button type="submit" className="primary-button">Start Timer</button>
           </form>
         </section>
       )}
 
-      {(isRunning || mediaConfig) && (
+      {shouldShowCountdown && (
         <section className="countdown-screen" aria-live="polite">
           <div className="countdown-meta">
-            <p className="eyebrow">{isRunning ? "Timer Running" : "Timer Finished"}</p>
+            <p className="eyebrow">{isTimerActive ? "Timer Running" : "Timer Finished"}</p>
             <button type="button" className="ghost-button" onClick={resetTimer}>Reset</button>
           </div>
           <div className="countdown-content">
-            <p className="countdown-label">{countdownLabel}</p>
-            <div className="countdown-value">{timeLeft}</div>
-            <p className="countdown-note">{countdownNote}</p>
+            <p className="countdown-label">{screenHeadline}</p>
+            <div className="countdown-value">{displayTime}</div>
+            <p className="countdown-note">{screenNote}</p>
           </div>
         </section>
       )}
 
-      <audio ref={audioRef} preload="auto" controls={showAudioControls} className={showAudioControls ? "audio-player" : "hidden-player"} />
-      {youtubeIsActive && (
+      <audio ref={audioRef} preload="auto" controls={showManualAudioControls} className={showManualAudioControls ? "audio-player" : "hidden-player"} />
+      {shouldRenderYouTubePlayer && (
         <iframe
           className="hidden-player"
-          src={mediaConfig.src}
+          src={playbackSource.src}
           allow="autoplay; encrypted-media"
           referrerPolicy="strict-origin-when-cross-origin"
           title="YouTube player"
