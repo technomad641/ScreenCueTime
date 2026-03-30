@@ -1,0 +1,217 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Syne:wght@700;800&display=swap");
+
+:root {
+  color-scheme: dark;
+  --bg-1: #06141f;
+  --bg-2: #13334c;
+  --panel: rgba(6, 20, 31, 0.72);
+  --panel-border: rgba(184, 230, 255, 0.18);
+  --text: #f4fbff;
+  --muted: #9cc4d7;
+  --accent: #ffd166;
+  --accent-strong: #ff8c42;
+  --shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top, rgba(255, 209, 102, 0.18), transparent 30%),
+    radial-gradient(circle at bottom left, rgba(255, 140, 66, 0.18), transparent 32%),
+    linear-gradient(140deg, var(--bg-1), var(--bg-2));
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.setup-card,
+.countdown-screen {
+  width: min(960px, 100%);
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
+}
+
+.setup-card {
+  border-radius: 32px;
+  padding: 36px;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  font-size: 0.8rem;
+}
+
+h1 {
+  margin: 0 0 28px;
+  max-width: 12ch;
+  font-family: "Syne", sans-serif;
+  font-size: clamp(2.6rem, 8vw, 5.5rem);
+  line-height: 0.95;
+}
+
+.timer-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.field {
+  display: grid;
+  gap: 10px;
+}
+
+.field span,
+.hint,
+.form-status,
+.countdown-label,
+.countdown-note {
+  color: var(--muted);
+}
+
+.field input {
+  width: 100%;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.field input:focus {
+  outline: 2px solid rgba(255, 209, 102, 0.4);
+  outline-offset: 2px;
+}
+
+.field-wide,
+.hint,
+.form-status,
+.primary-button {
+  grid-column: 1 / -1;
+}
+
+.hint,
+.form-status {
+  margin: 0;
+}
+
+.form-status {
+  min-height: 1.25rem;
+}
+
+.primary-button,
+.ghost-button {
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-button {
+  padding: 18px 24px;
+  color: #06141f;
+  background: linear-gradient(120deg, var(--accent), #ff8c42);
+}
+
+.ghost-button {
+  padding: 12px 18px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.countdown-screen {
+  min-height: calc(100vh - 48px);
+  width: 100%;
+  border-radius: 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 28px;
+}
+
+.countdown-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.countdown-content {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.countdown-label {
+  margin: 0 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+.countdown-value {
+  font-family: "Syne", sans-serif;
+  font-size: clamp(4.5rem, 18vw, 15rem);
+  line-height: 0.88;
+  letter-spacing: -0.06em;
+}
+
+.countdown-note {
+  margin: 14px 0 0;
+  font-size: 1rem;
+}
+
+.hidden-player {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  left: -9999px;
+  top: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.audio-player {
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  width: min(360px, calc(100vw - 48px));
+}
+
+@media (max-width: 720px) {
+  .setup-card,
+  .countdown-screen {
+    border-radius: 24px;
+  }
+
+  .setup-card {
+    padding: 24px;
+  }
+
+  .timer-form {
+    grid-template-columns: 1fr;
+  }
+}
