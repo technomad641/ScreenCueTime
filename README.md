@@ -1,63 +1,146 @@
-# ScreenCue Timer
+# ScreenCueTime
 
-A React + Vite web app for running an immersive fullscreen countdown timer and triggering a song when the timer completes.
+ScreenCueTime is a fullscreen countdown timer built with React and Vite. You set a duration, provide a song link, and the app switches from setup mode into an immersive timer screen that triggers playback when the countdown finishes.
+
+* * *
+
+## Overview
+
+This project is designed for moments where the timer itself is part of the experience: stage cues, event countdowns, watch parties, classroom prompts, workout blocks, or any setup where a large visible timer should end with a song or media cue.
+
+The app keeps the flow intentionally simple:
+
+- Configure hours, minutes, and seconds
+- Paste a direct audio URL or a YouTube link
+- Start the timer
+- Leave the tab open while the countdown runs
+- Let the app trigger playback when time reaches zero
+
+* * *
+
+## Architecture
+
+```text
+Timer Form -> Countdown State -> Countdown Display -> Playback Trigger
+```
+
+The app is a single-page frontend with three primary responsibilities:
+
+| Area | Responsibility |
+| --- | --- |
+| `src/App.jsx` | Timer state, validation, countdown lifecycle, media classification, playback handling |
+| `src/styles.css` | Fullscreen layout, responsive setup form, countdown screen styling |
+| `src/main.jsx` | React bootstrap and root render |
+
+* * *
 
 ## Features
 
-- Fullscreen countdown experience with a large timer display
-- Timer setup for hours, minutes, and seconds
-- Song link input during setup
-- Support for direct media URLs and YouTube links
-- Reset flow to stop playback and start over
-- Responsive layout for desktop and mobile
+- Fullscreen countdown experience with a large, high-contrast timer display
+- Timer setup using hours, minutes, and seconds inputs
+- Support for direct audio URLs and YouTube links
+- Automatic playback attempt when the timer reaches zero
+- Manual audio controls fallback if browser autoplay is blocked
+- Reset flow that stops playback and returns the app to setup mode
+- Responsive layout for desktop and mobile screens
 
-## Tech Stack
+* * *
 
-- React 18
-- Vite 4
-- Plain CSS
+## Prerequisites
 
-## Getting Started
+- Node.js 16 or newer
+- npm 7 or newer
 
-### Prerequisites
+* * *
 
-- Node.js 16+
-- npm 7+
+## Quick Start
 
-### Install dependencies
+### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### Start the development server
+### 2. Start the development server
 
 ```bash
 npm run dev
 ```
 
-Vite will print a local URL, typically `http://localhost:5173/`.
+Vite will print a local development URL, typically `http://localhost:5173`.
 
-### Build for production
+### 3. Build for production
 
 ```bash
 npm run build
 ```
 
-### Preview the production build
+### 4. Preview the production build locally
 
 ```bash
 npm run preview
 ```
 
-## Usage
+* * *
 
-1. Enter the timer duration.
-2. Paste a song link.
-3. Start the timer.
-4. Keep the tab open until the countdown completes.
+## Available Scripts
 
-Direct audio links are the most reliable for autoplay. Some browsers may block autoplay until the user interacts with the page. When that happens, the app exposes audio controls so playback can be started manually.
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Starts the Vite development server |
+| `npm run build` | Creates a production build in `dist/` |
+| `npm run preview` | Serves the production build locally for verification |
+
+* * *
+
+## How It Works
+
+1. The user enters a duration and a song link.
+2. The app validates that the timer is greater than zero.
+3. The app classifies the song link as either:
+   - a direct audio URL, or
+   - a YouTube URL that can be embedded
+4. A target timestamp is calculated from the current time.
+5. While the timer is running, the UI updates roughly every 250 ms.
+6. When the countdown reaches zero:
+   - direct audio is played through a hidden `<audio>` element, or
+   - YouTube is launched through an embedded iframe player
+7. If autoplay is blocked for direct audio, the app reveals native browser audio controls so playback can be started manually.
+
+* * *
+
+## Supported Media Input
+
+### Direct audio URLs
+
+Direct audio links are the most reliable option for end-of-timer playback.
+
+Examples:
+
+- `https://example.com/song.mp3`
+- `https://cdn.example.com/finale.wav`
+- `https://example.com/audio/cue.ogg`
+
+### YouTube links
+
+The app extracts the video ID from common YouTube URLs and embeds the video player when the timer completes.
+
+Examples:
+
+- `https://www.youtube.com/watch?v=VIDEO_ID`
+- `https://youtu.be/VIDEO_ID`
+
+* * *
+
+## Browser Playback Notes
+
+- Keep the tab open while the timer is running.
+- Direct audio URLs are more dependable than YouTube for automatic playback.
+- Some browsers block autoplay until the user has interacted with the page.
+- Embedded YouTube playback can still be affected by browser policy or provider restrictions.
+- If direct audio autoplay is blocked, the app shows audio controls so playback can be started manually.
+
+* * *
 
 ## Project Structure
 
@@ -65,14 +148,37 @@ Direct audio links are the most reliable for autoplay. Some browsers may block a
 .
 ├── index.html
 ├── package.json
+├── package-lock.json
 ├── src
 │   ├── App.jsx
 │   ├── main.jsx
 │   └── styles.css
+├── dist
+│   └── index.html
 └── vite.config.js
 ```
 
-## Notes
+* * *
 
-- YouTube playback depends on browser and embed restrictions.
-- The repository still contains Gradle/IntelliJ workspace files, but the product itself is a frontend app powered by Vite.
+## Tech Stack
+
+| Tool | Purpose |
+| --- | --- |
+| React 18 | UI and state management |
+| Vite 4 | Development server and frontend build pipeline |
+| Plain CSS | Styling and responsive layout |
+
+* * *
+
+## Local Development Notes
+
+- The repo still contains IntelliJ project files, but the product itself is a frontend Vite app.
+- The app does not require a backend service.
+- Production hosting can be any static site platform that serves the Vite build output.
+
+* * *
+
+## References
+
+- [React](https://react.dev/)
+- [Vite](https://vitejs.dev/)
