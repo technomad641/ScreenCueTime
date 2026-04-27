@@ -1,13 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
+import { getPlaybackNote, PLAYBACK_STATUS } from "./playback";
 import { classifySongLink, formatTime } from "./timerUtils";
 
 const APP_COPY = {
   idleHeadline: "Time left",
   finishedHeadline: "Time is up",
   idleNote: "Keep this tab open for playback.",
-  youtubeFinishedNote: "Timer complete. Embedded player started.",
-  directFinishedNote: "Timer complete. Playing your song.",
-  manualPlaybackNote: "Timer complete, but autoplay was blocked. Press play in the browser.",
 };
 
 const TIMER_PHASE = {
@@ -29,9 +27,9 @@ function App() {
   const [displayTime, setDisplayTime] = useState("00:00:00");
   const [validationMessage, setValidationMessage] = useState("");
   const [screenHeadline, setScreenHeadline] = useState(APP_COPY.idleHeadline);
-  const [screenNote, setScreenNote] = useState(APP_COPY.idleNote);
   const [timerPhase, setTimerPhase] = useState(TIMER_PHASE.IDLE);
   const [playbackSource, setPlaybackSource] = useState(null);
+  const [playbackStatus, setPlaybackStatus] = useState(PLAYBACK_STATUS.IDLE);
   const [showManualAudioControls, setShowManualAudioControls] = useState(false);
   const audioRef = useRef(null);
   const isTimerActive = timerPhase === TIMER_PHASE.RUNNING;
@@ -68,7 +66,7 @@ function App() {
     }
 
     if (playbackSource.type === "youtube") {
-      setScreenNote(APP_COPY.youtubeFinishedNote);
+      setPlaybackStatus(PLAYBACK_STATUS.PLAYING);
       return;
     }
 
@@ -80,11 +78,11 @@ function App() {
     audio.src = playbackSource.src;
     audio.play()
       .then(() => {
-        setScreenNote(APP_COPY.directFinishedNote);
+        setPlaybackStatus(PLAYBACK_STATUS.PLAYING);
       })
       .catch(() => {
         setShowManualAudioControls(true);
-        setScreenNote(APP_COPY.manualPlaybackNote);
+        setPlaybackStatus(PLAYBACK_STATUS.BLOCKED);
       });
   }, [playbackSource, timerPhase]);
 
@@ -96,6 +94,7 @@ function App() {
       audio.load();
     }
     setShowManualAudioControls(false);
+    setPlaybackStatus(playbackSource ? PLAYBACK_STATUS.STOPPED : PLAYBACK_STATUS.IDLE);
   }
 
   function handleChange(event) {
@@ -110,9 +109,9 @@ function App() {
     setDisplayTime("00:00:00");
     setValidationMessage("");
     setScreenHeadline(APP_COPY.idleHeadline);
-    setScreenNote(APP_COPY.idleNote);
     setTimerPhase(TIMER_PHASE.IDLE);
     setPlaybackSource(null);
+    setPlaybackStatus(PLAYBACK_STATUS.IDLE);
   }
 
   function handleSubmit(event) {
@@ -138,12 +137,14 @@ function App() {
     const nextTargetTimeMs = Date.now() + (totalSeconds * 1000);
     setValidationMessage("");
     setPlaybackSource(resolvedPlaybackSource);
+    setPlaybackStatus(PLAYBACK_STATUS.IDLE);
     setTargetTimeMs(nextTargetTimeMs);
     setDisplayTime(formatTime(totalSeconds * 1000));
     setScreenHeadline(APP_COPY.idleHeadline);
-    setScreenNote(APP_COPY.idleNote);
     setTimerPhase(TIMER_PHASE.RUNNING);
   }
+
+  const screenNote = getPlaybackNote(playbackSource, playbackStatus);
 
   return (
     <main className="app-shell">

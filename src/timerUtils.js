@@ -32,6 +32,11 @@ function isSupportedDirectMediaUrl(url) {
   return DIRECT_MEDIA_EXTENSIONS.some((extension) => pathname.endsWith(extension));
 }
 
+function deriveDirectMediaLabel(url) {
+  const segments = url.pathname.split("/").filter(Boolean);
+  return segments[segments.length - 1] || url.hostname;
+}
+
 export function parseYouTubeLink(input) {
   try {
     const url = new URL(input);
@@ -61,7 +66,9 @@ export function classifySongLink(input) {
   const youtubeId = parseYouTubeLink(input);
   if (youtubeId) {
     return {
+      label: `YouTube: ${youtubeId}`,
       type: "youtube",
+      videoId: youtubeId,
       src: `https://www.youtube.com/embed/${youtubeId}?autoplay=1&controls=1&rel=0`,
     };
   }
@@ -73,7 +80,11 @@ export function classifySongLink(input) {
       return null;
     }
 
-    return { type: "direct", src: url.toString() };
+    return {
+      label: deriveDirectMediaLabel(url),
+      type: "direct",
+      src: url.toString(),
+    };
   } catch {
     return null;
   }

@@ -27,15 +27,26 @@ describe("parseYouTubeLink", () => {
 describe("classifySongLink", () => {
   it("classifies YouTube links as embedded playback", () => {
     expect(classifySongLink("https://www.youtube.com/watch?v=abc123xyz")).toEqual({
+      label: "YouTube: abc123xyz",
       type: "youtube",
+      videoId: "abc123xyz",
       src: "https://www.youtube.com/embed/abc123xyz?autoplay=1&controls=1&rel=0",
     });
   });
 
   it("classifies direct media links by supported extension", () => {
     expect(classifySongLink("https://cdn.example.com/finale.mp3")).toEqual({
+      label: "finale.mp3",
       type: "direct",
       src: "https://cdn.example.com/finale.mp3",
+    });
+  });
+
+  it("derives labels from nested direct media paths", () => {
+    expect(classifySongLink("https://cdn.example.com/audio/finale.mp3?download=1")).toEqual({
+      label: "finale.mp3",
+      type: "direct",
+      src: "https://cdn.example.com/audio/finale.mp3?download=1",
     });
   });
 

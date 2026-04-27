@@ -28,7 +28,9 @@ The app is a single-page frontend with three primary responsibilities:
 
 | Area | Responsibility |
 | --- | --- |
-| `src/App.jsx` | Timer state, validation, countdown lifecycle, media classification, playback handling |
+| `src/App.jsx` | Timer state, countdown lifecycle, and playback orchestration |
+| `src/timerUtils.js` | Media classification, URL validation, source labels, and time formatting |
+| `src/playback.js` | Playback status model and user-facing playback messaging |
 | `src/styles.css` | Fullscreen layout, responsive setup form, countdown screen styling |
 | `src/main.jsx` | React bootstrap and root render |
 
@@ -39,7 +41,9 @@ The app is a single-page frontend with three primary responsibilities:
 - Fullscreen countdown experience with a large, high-contrast timer display
 - Timer setup using hours, minutes, and seconds inputs
 - Support for direct audio URLs and YouTube links
+- Structured playback source metadata with lightweight display labels
 - Automatic playback attempt when the timer reaches zero
+- Explicit playback status tracking for countdown completion and media state
 - Manual audio controls fallback if browser autoplay is blocked
 - Reset flow that stops playback and returns the app to setup mode
 - Responsive layout for desktop and mobile screens
@@ -88,6 +92,7 @@ npm run preview
 | Command | Description |
 | --- | --- |
 | `npm run dev` | Starts the Vite development server |
+| `npm run test` | Runs the unit test suite with Vitest |
 | `npm run build` | Creates a production build in `dist/` |
 | `npm run preview` | Serves the production build locally for verification |
 
@@ -100,6 +105,7 @@ npm run preview
 3. The app classifies the song link as either:
    - a direct audio URL, or
    - a YouTube URL that can be embedded
+   - and derives a simple label for the playback UI
 4. A target timestamp is calculated from the current time.
 5. While the timer is running, the UI updates roughly every 250 ms.
 6. When the countdown reaches zero:
@@ -151,8 +157,12 @@ Examples:
 ├── package-lock.json
 ├── src
 │   ├── App.jsx
+│   ├── playback.js
+│   ├── playback.test.js
 │   ├── main.jsx
-│   └── styles.css
+│   ├── styles.css
+│   ├── timerUtils.js
+│   └── timerUtils.test.js
 ├── dist
 │   └── index.html
 └── vite.config.js
