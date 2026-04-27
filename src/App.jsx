@@ -22,13 +22,56 @@ const INITIAL_TIMER_FORM = {
   songLink: "",
 };
 
+const YOUTUBE_HOSTS = new Set([
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+  "music.youtube.com",
+  "youtu.be",
+  "www.youtu.be",
+]);
+
+const DIRECT_MEDIA_EXTENSIONS = new Set([
+  ".mp3",
+  ".wav",
+  ".ogg",
+  ".oga",
+  ".m4a",
+  ".aac",
+  ".flac",
+  ".opus",
+  ".mp4",
+  ".m4v",
+  ".webm",
+  ".mpeg",
+  ".mpg",
+]);
+
+function isSupportedDirectMediaUrl(url) {
+  if (!["http:", "https:"].includes(url.protocol)) {
+    return false;
+  }
+
+  const pathname = url.pathname.toLowerCase();
+  return Array.from(DIRECT_MEDIA_EXTENSIONS).some((extension) => pathname.endsWith(extension));
+}
+
 function parseYouTubeLink(input) {
   try {
     const url = new URL(input);
-    if (url.hostname.includes("youtu.be")) {
-      return url.pathname.slice(1) || null;
+    if (!YOUTUBE_HOSTS.has(url.hostname.toLowerCase())) {
+      return null;
     }
-    if (url.hostname.includes("youtube.com")) {
+
+    if (url.hostname.toLowerCase().endsWith("youtu.be")) {
+      return url.pathname.split("/").filter(Boolean)[0] || null;
+    }
+
+    if (url.pathname.startsWith("/embed/")) {
+      return url.pathname.split("/")[2] || null;
+    }
+
+    if (url.pathname === "/watch") {
       return url.searchParams.get("v");
     }
   } catch {
@@ -49,6 +92,11 @@ function classifySongLink(input) {
 
   try {
     const url = new URL(input);
+
+    if (!isSupportedDirectMediaUrl(url)) {
+      return null;
+    }
+
     return { type: "direct", src: url.toString() };
   } catch {
     return null;
