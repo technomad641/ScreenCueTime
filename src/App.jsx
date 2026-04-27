@@ -33,12 +33,13 @@ function App() {
   const [playbackStatus, setPlaybackStatus] = useState(PLAYBACK_STATUS.IDLE);
   const [showManualAudioControls, setShowManualAudioControls] = useState(false);
   const audioRef = useRef(null);
+  const youtubePlayerRef = useRef(null);
   const isTimerActive = timerPhase === TIMER_PHASE.RUNNING;
   const isTimerFinished = timerPhase === TIMER_PHASE.FINISHED;
   const isDirectPlayback = playbackSource?.type === "direct";
+  const isYouTubePlayback = playbackSource?.type === "youtube";
   const shouldShowSetup = timerPhase === TIMER_PHASE.IDLE;
   const shouldShowCountdown = timerPhase !== TIMER_PHASE.IDLE;
-  const shouldRenderYouTubePlayer = isTimerFinished && playbackSource?.type === "youtube";
 
   useEffect(() => {
     if (timerPhase !== TIMER_PHASE.RUNNING || !targetTimeMs) {
@@ -67,7 +68,7 @@ function App() {
       return;
     }
 
-    if (playbackSource.type === "youtube") {
+    if (isYouTubePlayback) {
       setPlaybackStatus(PLAYBACK_STATUS.PLAYING);
       return;
     }
@@ -86,9 +87,30 @@ function App() {
         setShowManualAudioControls(true);
         setPlaybackStatus(PLAYBACK_STATUS.BLOCKED);
       });
-  }, [playbackSource, timerPhase]);
+  }, [isYouTubePlayback, playbackSource, timerPhase]);
+
+  function sendYouTubeCommand(func, args = []) {
+    const playerWindow = youtubePlayerRef.current?.contentWindow;
+    if (!playerWindow) {
+      return;
+    }
+
+    playerWindow.postMessage(JSON.stringify({
+      event: "command",
+      func,
+      args,
+    }), "*");
+  }
 
   function stopPlayback({ unload = false } = {}) {
+    if (isYouTubePlayback) {
+      if (!unload) {
+        sendYouTubeCommand("stopVideo");
+      }
+      setPlaybackStatus(playbackSource ? PLAYBACK_STATUS.STOPPED : PLAYBACK_STATUS.IDLE);
+      return;
+    }
+
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
@@ -103,6 +125,12 @@ function App() {
   }
 
   function playPlayback() {
+    if (isYouTubePlayback) {
+      sendYouTubeCommand("playVideo");
+      setPlaybackStatus(PLAYBACK_STATUS.PLAYING);
+      return;
+    }
+
     if (!isDirectPlayback) {
       return;
     }
@@ -127,6 +155,12 @@ function App() {
   }
 
   function pausePlayback() {
+    if (isYouTubePlayback) {
+      sendYouTubeCommand("pauseVideo");
+      setPlaybackStatus(PLAYBACK_STATUS.PAUSED);
+      return;
+    }
+
     if (!isDirectPlayback) {
       return;
     }
@@ -141,6 +175,13 @@ function App() {
   }
 
   function replayPlayback() {
+    if (isYouTubePlayback) {
+      sendYouTubeCommand("seekTo", [0, true]);
+      sendYouTubeCommand("playVideo");
+      setPlaybackStatus(PLAYBACK_STATUS.PLAYING);
+      return;
+    }
+
     if (!isDirectPlayback) {
       return;
     }
@@ -254,7 +295,7 @@ function App() {
                 playbackSource={playbackSource}
                 playbackStatus={playbackStatus}
                 note={screenNote}
-                controlsDisabled={!isDirectPlayback}
+                controlsDisabled={false}
                 onPlay={playPlayback}
                 onPause={pausePlayback}
                 onStop={stopPlayback}
@@ -273,6 +314,16 @@ function App() {
                       }
                     }}
                     className="playback-panel__native-player"
+                  />
+                )}
+                {isYouTubePlayback && (
+                  <iframe
+                    ref={youtubePlayerRef}
+                    className="playback-panel__video-frame"
+                    src={playbackSource.src}
+                    allow="autoplay; encrypted-media; picture-in-picture"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    title={playbackSource.label}
                   />
                 )}
               </PlaybackPanel>
@@ -294,15 +345,6 @@ function App() {
             }
           }}
           className={showManualAudioControls ? "audio-player" : "hidden-player"}
-        />
-      )}
-      {shouldRenderYouTubePlayer && (
-        <iframe
-          className="hidden-player"
-          src={playbackSource.src}
-          allow="autoplay; encrypted-media"
-          referrerPolicy="strict-origin-when-cross-origin"
-          title="YouTube player"
         />
       )}
     </main>

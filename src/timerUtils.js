@@ -69,7 +69,7 @@ export function classifySongLink(input) {
       label: `YouTube: ${youtubeId}`,
       type: "youtube",
       videoId: youtubeId,
-      src: `https://www.youtube.com/embed/${youtubeId}?autoplay=1&controls=1&rel=0`,
+      src: `https://www.youtube.com/embed/${youtubeId}?autoplay=1&controls=1&rel=0&enablejsapi=1`,
     };
   }
 

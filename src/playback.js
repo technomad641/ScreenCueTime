@@ -21,7 +21,7 @@ export function getPlaybackStatusLabel(status) {
 }
 
 export function isAppPlaybackControllable(playbackSource) {
-  return playbackSource?.type === "direct";
+  return playbackSource?.type === "direct" || playbackSource?.type === "youtube";
 }
 
 export function getPlaybackNote(playbackSource, playbackStatus) {
@@ -32,7 +32,7 @@ export function getPlaybackNote(playbackSource, playbackStatus) {
   if (playbackSource.type === "youtube") {
     switch (playbackStatus) {
       case PLAYBACK_STATUS.PLAYING:
-        return "Timer complete. Your YouTube video is ready to play.";
+        return "Timer complete. If the video did not start automatically, press Play.";
       case PLAYBACK_STATUS.PAUSED:
         return "Playback paused. Press play to resume your YouTube video.";
       case PLAYBACK_STATUS.STOPPED:
@@ -56,7 +56,7 @@ export function getPlaybackNote(playbackSource, playbackStatus) {
     case PLAYBACK_STATUS.STOPPED:
       return "Playback stopped. Replay to start again.";
     case PLAYBACK_STATUS.BLOCKED:
-      return "Playback was blocked. Press play in the browser controls.";
+      return "Playback was blocked. Press Play or use the browser controls.";
     case PLAYBACK_STATUS.FAILED:
       return "We could not start this media file.";
     case PLAYBACK_STATUS.ENDED:

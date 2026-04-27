@@ -16,6 +16,8 @@ function PlaybackPanel({
     return null;
   }
 
+  const playButtonLabel = playbackStatus === "blocked" ? "Play Now" : "Play";
+
   return (
     <section className="playback-panel" aria-label="Playback panel">
       <div className="playback-panel__header">
@@ -30,7 +32,7 @@ function PlaybackPanel({
       </div>
       <p className="playback-panel__note">{note}</p>
       <div className="playback-controls">
-        <button type="button" className="ghost-button" onClick={onPlay} disabled={controlsDisabled}>Play</button>
+        <button type="button" className="ghost-button" onClick={onPlay} disabled={controlsDisabled}>{playButtonLabel}</button>
         <button type="button" className="ghost-button" onClick={onPause} disabled={controlsDisabled}>Pause</button>
         <button type="button" className="ghost-button" onClick={onStop} disabled={controlsDisabled}>Stop</button>
         <button type="button" className="primary-button playback-controls__replay" onClick={onReplay} disabled={controlsDisabled}>Replay</button>

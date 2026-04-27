@@ -248,6 +248,15 @@ h1 {
   margin-top: 20px;
 }
 
+.playback-panel__video-frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-top: 20px;
+  border: 0;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
 .hidden-player {
   position: fixed;
   width: 1px;

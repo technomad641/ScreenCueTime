@@ -13,7 +13,7 @@ export default function runTimerUtilsTests() {
     label: "YouTube: abc123xyz",
     type: "youtube",
     videoId: "abc123xyz",
-    src: "https://www.youtube.com/embed/abc123xyz?autoplay=1&controls=1&rel=0",
+    src: "https://www.youtube.com/embed/abc123xyz?autoplay=1&controls=1&rel=0&enablejsapi=1",
   });
 
   assert.deepEqual(classifySongLink("https://cdn.example.com/finale.mp3"), {

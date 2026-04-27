@@ -46,6 +46,8 @@ The app is a single-page frontend with three primary responsibilities:
 - Explicit playback status tracking for countdown completion and media state
 - Visible finished-state playback panel for direct media
 - App-level direct media controls for play, pause, stop, and replay
+- Visible YouTube player inside the finished-state playback panel
+- App-level YouTube playback commands for play, pause, stop, and replay
 - Manual audio controls fallback if browser autoplay is blocked
 - Reset flow that stops playback and returns the app to setup mode
 - Responsive layout for desktop and mobile screens
@@ -112,8 +114,8 @@ npm run preview
 5. While the timer is running, the UI updates roughly every 250 ms.
 6. When the countdown reaches zero:
    - direct audio is played through a visible playback panel with app-level controls, or
-   - YouTube is launched through an embedded iframe player
-7. If autoplay is blocked for direct audio, the app reveals native browser controls and keeps playback actions visible for recovery.
+   - YouTube is launched through a visible embedded player with app controls
+7. If autoplay is blocked, the app keeps recovery controls visible so playback can be started manually.
 
 * * *
 

@@ -14,17 +14,17 @@ export default function runPlaybackTests() {
   assert.equal(getPlaybackStatusLabel(PLAYBACK_STATUS.BLOCKED), "Blocked");
 
   assert.equal(isAppPlaybackControllable({ type: "direct" }), true);
-  assert.equal(isAppPlaybackControllable({ type: "youtube" }), false);
+  assert.equal(isAppPlaybackControllable({ type: "youtube" }), true);
   assert.equal(isAppPlaybackControllable(null), false);
 
   assert.equal(getPlaybackNote(null, PLAYBACK_STATUS.IDLE), "Keep this tab open for playback.");
   assert.equal(
     getPlaybackNote({ type: "direct", label: "finale.mp3" }, PLAYBACK_STATUS.BLOCKED),
-    "Playback was blocked. Press play in the browser controls.",
+    "Playback was blocked. Press Play or use the browser controls.",
   );
   assert.equal(
     getPlaybackNote({ type: "youtube", label: "YouTube: abc123xyz" }, PLAYBACK_STATUS.PLAYING),
-    "Timer complete. Your YouTube video is ready to play.",
+    "Timer complete. If the video did not start automatically, press Play.",
   );
   assert.equal(
     getPlaybackNote({ type: "youtube", label: "YouTube: abc123xyz" }, PLAYBACK_STATUS.STOPPED),
