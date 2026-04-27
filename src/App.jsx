@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import PlaybackPanel from "./PlaybackPanel";
 import { getPlaybackNote, PLAYBACK_STATUS } from "./playback";
 import { classifySongLink, formatTime } from "./timerUtils";
 
@@ -34,6 +35,7 @@ function App() {
   const audioRef = useRef(null);
   const isTimerActive = timerPhase === TIMER_PHASE.RUNNING;
   const isTimerFinished = timerPhase === TIMER_PHASE.FINISHED;
+  const isDirectPlayback = playbackSource?.type === "direct";
   const shouldShowSetup = timerPhase === TIMER_PHASE.IDLE;
   const shouldShowCountdown = timerPhase !== TIMER_PHASE.IDLE;
   const shouldRenderYouTubePlayer = isTimerFinished && playbackSource?.type === "youtube";
@@ -86,15 +88,69 @@ function App() {
       });
   }, [playbackSource, timerPhase]);
 
-  function stopPlayback() {
+  function stopPlayback({ unload = false } = {}) {
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
-      audio.removeAttribute("src");
-      audio.load();
+      audio.currentTime = 0;
+      if (unload) {
+        audio.removeAttribute("src");
+        audio.load();
+      }
     }
     setShowManualAudioControls(false);
     setPlaybackStatus(playbackSource ? PLAYBACK_STATUS.STOPPED : PLAYBACK_STATUS.IDLE);
+  }
+
+  function playPlayback() {
+    if (!isDirectPlayback) {
+      return;
+    }
+
+    const audio = audioRef.current;
+    if (!audio || !playbackSource) {
+      return;
+    }
+
+    if (audio.src !== playbackSource.src) {
+      audio.src = playbackSource.src;
+    }
+
+    audio.play()
+      .then(() => {
+        setPlaybackStatus(PLAYBACK_STATUS.PLAYING);
+      })
+      .catch(() => {
+        setShowManualAudioControls(true);
+        setPlaybackStatus(PLAYBACK_STATUS.BLOCKED);
+      });
+  }
+
+  function pausePlayback() {
+    if (!isDirectPlayback) {
+      return;
+    }
+
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    audio.pause();
+    setPlaybackStatus(PLAYBACK_STATUS.PAUSED);
+  }
+
+  function replayPlayback() {
+    if (!isDirectPlayback) {
+      return;
+    }
+
+    const audio = audioRef.current;
+    if (audio) {
+      audio.currentTime = 0;
+    }
+
+    playPlayback();
   }
 
   function handleChange(event) {
@@ -103,7 +159,7 @@ function App() {
   }
 
   function resetTimer() {
-    stopPlayback();
+    stopPlayback({ unload: true });
     setTimerForm(INITIAL_TIMER_FORM);
     setTargetTimeMs(null);
     setDisplayTime("00:00:00");
@@ -133,7 +189,7 @@ function App() {
       return;
     }
 
-    stopPlayback();
+    stopPlayback({ unload: true });
     const nextTargetTimeMs = Date.now() + (totalSeconds * 1000);
     setValidationMessage("");
     setPlaybackSource(resolvedPlaybackSource);
@@ -193,11 +249,53 @@ function App() {
             <p className="countdown-label">{screenHeadline}</p>
             <div className="countdown-value">{displayTime}</div>
             <p className="countdown-note">{screenNote}</p>
+            {isTimerFinished && playbackSource && (
+              <PlaybackPanel
+                playbackSource={playbackSource}
+                playbackStatus={playbackStatus}
+                note={screenNote}
+                controlsDisabled={!isDirectPlayback}
+                onPlay={playPlayback}
+                onPause={pausePlayback}
+                onStop={stopPlayback}
+                onReplay={replayPlayback}
+              >
+                {isDirectPlayback && (
+                  <audio
+                    ref={audioRef}
+                    preload="auto"
+                    controls
+                    onEnded={() => setPlaybackStatus(PLAYBACK_STATUS.ENDED)}
+                    onPlay={() => setPlaybackStatus(PLAYBACK_STATUS.PLAYING)}
+                    onPause={() => {
+                      if (playbackStatus === PLAYBACK_STATUS.PLAYING) {
+                        setPlaybackStatus(PLAYBACK_STATUS.PAUSED);
+                      }
+                    }}
+                    className="playback-panel__native-player"
+                  />
+                )}
+              </PlaybackPanel>
+            )}
           </div>
         </section>
       )}
 
-      <audio ref={audioRef} preload="auto" controls={showManualAudioControls} className={showManualAudioControls ? "audio-player" : "hidden-player"} />
+      {!isTimerFinished && (
+        <audio
+          ref={audioRef}
+          preload="auto"
+          controls={showManualAudioControls}
+          onEnded={() => setPlaybackStatus(PLAYBACK_STATUS.ENDED)}
+          onPlay={() => setPlaybackStatus(PLAYBACK_STATUS.PLAYING)}
+          onPause={() => {
+            if (playbackStatus === PLAYBACK_STATUS.PLAYING) {
+              setPlaybackStatus(PLAYBACK_STATUS.PAUSED);
+            }
+          }}
+          className={showManualAudioControls ? "audio-player" : "hidden-player"}
+        />
+      )}
       {shouldRenderYouTubePlayer && (
         <iframe
           className="hidden-player"

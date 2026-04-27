@@ -8,6 +8,22 @@ export const PLAYBACK_STATUS = {
   FAILED: "failed",
 };
 
+export function getPlaybackTypeLabel(type) {
+  if (type === "youtube") {
+    return "YouTube";
+  }
+
+  return "Direct Media";
+}
+
+export function getPlaybackStatusLabel(status) {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+export function isAppPlaybackControllable(playbackSource) {
+  return playbackSource?.type === "direct";
+}
+
 export function getPlaybackNote(playbackSource, playbackStatus) {
   if (!playbackSource) {
     return "Keep this tab open for playback.";

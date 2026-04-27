@@ -44,6 +44,8 @@ The app is a single-page frontend with three primary responsibilities:
 - Structured playback source metadata with lightweight display labels
 - Automatic playback attempt when the timer reaches zero
 - Explicit playback status tracking for countdown completion and media state
+- Visible finished-state playback panel for direct media
+- App-level direct media controls for play, pause, stop, and replay
 - Manual audio controls fallback if browser autoplay is blocked
 - Reset flow that stops playback and returns the app to setup mode
 - Responsive layout for desktop and mobile screens
@@ -92,7 +94,7 @@ npm run preview
 | Command | Description |
 | --- | --- |
 | `npm run dev` | Starts the Vite development server |
-| `npm run test` | Runs the unit test suite with Vitest |
+| `npm run test` | Runs the unit test suite |
 | `npm run build` | Creates a production build in `dist/` |
 | `npm run preview` | Serves the production build locally for verification |
 
@@ -109,9 +111,9 @@ npm run preview
 4. A target timestamp is calculated from the current time.
 5. While the timer is running, the UI updates roughly every 250 ms.
 6. When the countdown reaches zero:
-   - direct audio is played through a hidden `<audio>` element, or
+   - direct audio is played through a visible playback panel with app-level controls, or
    - YouTube is launched through an embedded iframe player
-7. If autoplay is blocked for direct audio, the app reveals native browser audio controls so playback can be started manually.
+7. If autoplay is blocked for direct audio, the app reveals native browser controls and keeps playback actions visible for recovery.
 
 * * *
 
@@ -155,8 +157,11 @@ Examples:
 ├── index.html
 ├── package.json
 ├── package-lock.json
+├── scripts
+│   └── run-tests.mjs
 ├── src
 │   ├── App.jsx
+│   ├── PlaybackPanel.jsx
 │   ├── playback.js
 │   ├── playback.test.js
 │   ├── main.jsx
