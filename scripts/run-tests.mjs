@@ -1,8 +1,12 @@
 import runPlaybackTests from "../src/playback.test.js";
+import runPresetsTests from "../src/presets.test.js";
+import runShareLinkTests from "../src/shareLink.test.js";
 import runTimerUtilsTests from "../src/timerUtils.test.js";
 
 const testSuites = [
   ["playback helpers", runPlaybackTests],
+  ["presets", runPresetsTests],
+  ["share link", runShareLinkTests],
   ["timer utils", runTimerUtilsTests],
 ];
 

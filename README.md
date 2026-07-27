@@ -10,11 +10,12 @@ This project is designed for moments where the timer itself is part of the exper
 
 The app keeps the flow intentionally simple:
 
-- Configure hours, minutes, and seconds
-- Paste a direct audio URL or a YouTube link
+- Configure hours, minutes, and seconds (or tap a quick-start preset)
+- Paste a direct audio URL or a YouTube link, and optionally test it first
 - Start the timer
+- Pause and resume the countdown as needed
 - Leave the tab open while the countdown runs
-- Let the app trigger playback when time reaches zero
+- Let the app trigger playback — plus a chime and screen flash — when time reaches zero
 
 * * *
 
@@ -24,13 +25,17 @@ The app keeps the flow intentionally simple:
 Timer Form -> Countdown State -> Countdown Display -> Playback Trigger
 ```
 
-The app is a single-page frontend with three primary responsibilities:
+The app is a single-page frontend that splits its responsibilities across a small set of focused modules:
 
 | Area | Responsibility |
 | --- | --- |
-| `src/App.jsx` | Timer state, countdown lifecycle, and playback orchestration |
+| `src/App.jsx` | Timer state, countdown lifecycle (run/pause/resume/finish), and playback orchestration |
 | `src/timerUtils.js` | Media classification, URL validation, source labels, and time formatting |
 | `src/playback.js` | Playback status model and user-facing playback messaging |
+| `src/PlaybackPanel.jsx` | Visible finished-state media panel with app-level controls |
+| `src/cue.js` | Media-independent finish chime built on the Web Audio API |
+| `src/presets.js` | Quick-start presets and the `localStorage`-backed recent-timer history |
+| `src/shareLink.js` | Encode/decode a timer configuration to and from URL query parameters |
 | `src/styles.css` | Fullscreen layout, responsive setup form, countdown screen styling |
 | `src/main.jsx` | React bootstrap and root render |
 
@@ -40,6 +45,12 @@ The app is a single-page frontend with three primary responsibilities:
 
 - Fullscreen countdown experience with a large, high-contrast timer display
 - Timer setup using hours, minutes, and seconds inputs
+- Quick-start presets (1/5/10 min, Pomodoro, break) that fill the duration in one tap
+- Recently-used timers remembered in `localStorage` for one-tap reuse
+- Media-independent finish cue: a synthesized chime plus a full-screen flash so the finish lands even without media
+- Pause and resume controls for the running countdown
+- Test Media action that verifies a link loads before the timer starts
+- Shareable links that encode the duration and song link in the URL for bookmarking or sharing
 - Support for direct audio URLs and YouTube links
 - Structured playback source metadata with lightweight display labels
 - Automatic playback attempt when the timer reaches zero
@@ -104,18 +115,20 @@ npm run preview
 
 ## How It Works
 
-1. The user enters a duration and a song link.
-2. The app validates that the timer is greater than zero.
-3. The app classifies the song link as either:
+1. The user enters a duration (or taps a preset) and a song link. Prior timers can be reloaded from the recent-timer list, and a shared link can prefill the whole setup from the URL.
+2. Optionally, the user tests the media so a broken link is caught before the timer starts.
+3. The app validates that the timer is greater than zero.
+4. The app classifies the song link as either:
    - a direct audio URL, or
    - a YouTube URL that can be embedded
    - and derives a simple label for the playback UI
-4. A target timestamp is calculated from the current time.
-5. While the timer is running, the UI updates roughly every 250 ms.
-6. When the countdown reaches zero:
+5. A target timestamp is calculated from the current time.
+6. While the timer is running, the UI updates roughly every 250 ms, and the countdown can be paused and resumed.
+7. When the countdown reaches zero:
+   - a synthesized chime plays and the screen flashes, independent of any media, so the finish always lands, and
    - direct audio is played through a visible playback panel with app-level controls, or
    - YouTube is launched through a visible embedded player with app controls
-7. If autoplay is blocked, the app keeps recovery controls visible so playback can be started manually.
+8. If autoplay is blocked, the app keeps recovery controls visible so playback can be started manually.
 
 * * *
 
@@ -164,8 +177,13 @@ Examples:
 ├── src
 │   ├── App.jsx
 │   ├── PlaybackPanel.jsx
+│   ├── cue.js
 │   ├── playback.js
 │   ├── playback.test.js
+│   ├── presets.js
+│   ├── presets.test.js
+│   ├── shareLink.js
+│   ├── shareLink.test.js
 │   ├── main.jsx
 │   ├── styles.css
 │   ├── timerUtils.js
