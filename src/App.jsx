@@ -1,5 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import CountdownDisplay from "./CountdownDisplay";
 import PlaybackPanel from "./PlaybackPanel";
+import ProgressRing from "./ProgressRing";
+import ThemeToggle from "./ThemeToggle";
 import { createChime } from "./cue";
 import { getPlaybackNote, PLAYBACK_STATUS } from "./playback";
 import {
@@ -9,7 +13,9 @@ import {
   saveRecentTimer,
 } from "./presets";
 import { decodeTimerConfig, encodeTimerConfig } from "./shareLink";
+import { THEME, loadTheme, nextTheme, resolveTheme, saveTheme } from "./theme";
 import { classifySongLink, formatTime } from "./timerUtils";
+import { runViewTransition } from "./viewTransition";
 
 const APP_COPY = {
   idleHeadline: "Time left",
@@ -34,12 +40,16 @@ const INITIAL_TIMER_FORM = {
 const INITIAL_MEDIA_TEST = { status: "idle", message: "" };
 const FLASH_DURATION_MS = 2600;
 const MEDIA_TEST_TIMEOUT_MS = 8000;
+const CONTROLS_IDLE_MS = 2800;
 
 function App() {
   const [timerForm, setTimerForm] = useState(INITIAL_TIMER_FORM);
   const [targetTimeMs, setTargetTimeMs] = useState(null);
   const [pausedRemainingMs, setPausedRemainingMs] = useState(null);
+  const [totalDurationMs, setTotalDurationMs] = useState(0);
+  const [remainingFraction, setRemainingFraction] = useState(1);
   const [displayTime, setDisplayTime] = useState("00:00:00");
+  const [announcement, setAnnouncement] = useState("");
   const [validationMessage, setValidationMessage] = useState("");
   const [screenHeadline, setScreenHeadline] = useState(APP_COPY.idleHeadline);
   const [timerPhase, setTimerPhase] = useState(TIMER_PHASE.IDLE);
@@ -50,9 +60,14 @@ function App() {
   const [recentTimers, setRecentTimers] = useState([]);
   const [mediaTest, setMediaTest] = useState(INITIAL_MEDIA_TEST);
   const [shareFeedback, setShareFeedback] = useState("");
+  const [themePreference, setThemePreference] = useState(THEME.SYSTEM);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [controlsHidden, setControlsHidden] = useState(false);
   const audioRef = useRef(null);
   const youtubePlayerRef = useRef(null);
   const chimeRef = useRef(null);
+  const countdownRef = useRef(null);
+  const lastAnnouncedRef = useRef(null);
   const isTimerRunning = timerPhase === TIMER_PHASE.RUNNING;
   const isTimerPaused = timerPhase === TIMER_PHASE.PAUSED;
   const isTimerFinished = timerPhase === TIMER_PHASE.FINISHED;
@@ -60,6 +75,7 @@ function App() {
   const isYouTubePlayback = playbackSource?.type === "youtube";
   const shouldShowSetup = timerPhase === TIMER_PHASE.IDLE;
   const shouldShowCountdown = timerPhase !== TIMER_PHASE.IDLE;
+  const metaHidden = controlsHidden && (isTimerRunning || isTimerPaused);
 
   function getStorage() {
     try {
@@ -76,14 +92,23 @@ function App() {
     return chimeRef.current;
   }
 
-  // On first load, prefill from a shared link (if present) and restore the
-  // recently-used timer history.
+  // Run a phase change as an animated View Transition. flushSync forces React to
+  // commit the DOM synchronously inside the transition callback so the API can
+  // snapshot before/after; runViewTransition no-ops the animation when the API
+  // is unavailable or the user prefers reduced motion.
+  function transition(apply) {
+    runViewTransition(() => flushSync(apply));
+  }
+
+  // On first load, prefill from a shared link (if present), restore the
+  // recently-used timer history, and restore the saved theme preference.
   useEffect(() => {
     const shared = decodeTimerConfig(window.location.search);
     if (shared) {
       setTimerForm((currentForm) => ({ ...currentForm, ...shared }));
     }
     setRecentTimers(loadRecentTimers(getStorage()));
+    setThemePreference(loadTheme(getStorage()));
   }, []);
 
   useEffect(() => {
@@ -92,14 +117,99 @@ function App() {
     };
   }, []);
 
+  // Paint the resolved theme onto the document root, and keep following the OS
+  // while the preference is "system".
+  useEffect(() => {
+    const root = document.documentElement;
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      root.setAttribute("data-theme", resolveTheme(themePreference, query.matches));
+    };
+    apply();
+    query.addEventListener?.("change", apply);
+    return () => query.removeEventListener?.("change", apply);
+  }, [themePreference]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  // Auto-hide the on-screen controls after a short idle while the countdown is
+  // running or paused, so presenter mode stays uncluttered; any input reveals
+  // them again. Controls never hide once the timer has finished.
+  useEffect(() => {
+    if (!isTimerRunning && !isTimerPaused) {
+      setControlsHidden(false);
+      return undefined;
+    }
+
+    let timeoutId;
+    const reveal = () => {
+      setControlsHidden(false);
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => setControlsHidden(true), CONTROLS_IDLE_MS);
+    };
+
+    reveal();
+    window.addEventListener("mousemove", reveal);
+    window.addEventListener("keydown", reveal);
+    window.addEventListener("touchstart", reveal, { passive: true });
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("mousemove", reveal);
+      window.removeEventListener("keydown", reveal);
+      window.removeEventListener("touchstart", reveal);
+    };
+  }, [isTimerRunning, isTimerPaused]);
+
+  // Move focus to the countdown region when it takes over the screen so keyboard
+  // and screen-reader users land in the right place.
+  useEffect(() => {
+    if (timerPhase === TIMER_PHASE.RUNNING) {
+      countdownRef.current?.focus({ preventScroll: true });
+    }
+  }, [timerPhase]);
+
+  // Space toggles pause/resume, except when a form control or button is focused
+  // (there the key already has its own meaning).
+  useEffect(() => {
+    if (!isTimerRunning && !isTimerPaused) {
+      return undefined;
+    }
+
+    const onKeyDown = (event) => {
+      if (event.code !== "Space" && event.key !== " ") {
+        return;
+      }
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "BUTTON" || tag === "A" || tag === "SELECT") {
+        return;
+      }
+      event.preventDefault();
+      if (isTimerRunning) {
+        pauseCountdown();
+      } else {
+        resumeCountdown();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTimerRunning, isTimerPaused, targetTimeMs, pausedRemainingMs, totalDurationMs]);
+
   useEffect(() => {
     if (timerPhase !== TIMER_PHASE.RUNNING || !targetTimeMs) {
       return undefined;
     }
 
-    const intervalId = window.setInterval(() => {
+    const tick = () => {
       const remainingMs = targetTimeMs - Date.now();
       setDisplayTime(formatTime(remainingMs));
+      setRemainingFraction(totalDurationMs > 0 ? Math.min(1, Math.max(0, remainingMs / totalDurationMs)) : 0);
+      announceRemaining(remainingMs);
 
       if (remainingMs > 0) {
         return;
@@ -107,14 +217,18 @@ function App() {
 
       window.clearInterval(intervalId);
       setDisplayTime("00:00:00");
+      setRemainingFraction(0);
       setScreenHeadline(APP_COPY.finishedHeadline);
-      setTimerPhase(TIMER_PHASE.FINISHED);
-    }, 250);
+      setAnnouncement("Time is up.");
+      transition(() => setTimerPhase(TIMER_PHASE.FINISHED));
+    };
 
+    const intervalId = window.setInterval(tick, 250);
     return () => window.clearInterval(intervalId);
-  }, [targetTimeMs, timerPhase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetTimeMs, timerPhase, totalDurationMs]);
 
-  // Fire the media-independent finish cue (chime + screen flash) as soon as the
+  // Fire the media-independent finish cue (chime + screen bloom) as soon as the
   // countdown completes, regardless of whether media playback succeeds.
   useEffect(() => {
     if (timerPhase !== TIMER_PHASE.FINISHED) {
@@ -152,6 +266,33 @@ function App() {
         setPlaybackStatus(PLAYBACK_STATUS.BLOCKED);
       });
   }, [isYouTubePlayback, playbackSource, timerPhase]);
+
+  // Announce the remaining time politely at meaningful moments only: every 15s
+  // milestone and each of the final ten seconds — never on every 250ms tick.
+  function announceRemaining(remainingMs) {
+    const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+    const atMilestone = totalSeconds > 0 && (totalSeconds <= 10 || totalSeconds % 15 === 0);
+    if (!atMilestone || lastAnnouncedRef.current === totalSeconds) {
+      return;
+    }
+    lastAnnouncedRef.current = totalSeconds;
+    setAnnouncement(`${formatTime(totalSeconds * 1000)} remaining.`);
+  }
+
+  function cycleTheme() {
+    const next = nextTheme(themePreference);
+    saveTheme(getStorage(), next);
+    setThemePreference(next);
+  }
+
+  function toggleFullscreen() {
+    const target = countdownRef.current || document.documentElement;
+    if (!document.fullscreenElement) {
+      target.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  }
 
   function sendYouTubeCommand(func, args = []) {
     const playerWindow = youtubePlayerRef.current?.contentWindow;
@@ -359,8 +500,10 @@ function App() {
     const remainingMs = Math.max(0, targetTimeMs - Date.now());
     setPausedRemainingMs(remainingMs);
     setDisplayTime(formatTime(remainingMs));
+    setRemainingFraction(totalDurationMs > 0 ? Math.min(1, remainingMs / totalDurationMs) : 0);
     setScreenHeadline("Paused");
-    setTimerPhase(TIMER_PHASE.PAUSED);
+    setAnnouncement("Paused.");
+    transition(() => setTimerPhase(TIMER_PHASE.PAUSED));
   }
 
   function resumeCountdown() {
@@ -371,23 +514,34 @@ function App() {
     setTargetTimeMs(Date.now() + pausedRemainingMs);
     setPausedRemainingMs(null);
     setScreenHeadline(APP_COPY.idleHeadline);
-    setTimerPhase(TIMER_PHASE.RUNNING);
+    setAnnouncement("Resumed.");
+    lastAnnouncedRef.current = null;
+    transition(() => setTimerPhase(TIMER_PHASE.RUNNING));
   }
 
   function resetTimer() {
     stopPlayback({ unload: true });
-    setTimerForm(INITIAL_TIMER_FORM);
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    }
     setTargetTimeMs(null);
     setPausedRemainingMs(null);
+    setTotalDurationMs(0);
+    setRemainingFraction(1);
     setDisplayTime("00:00:00");
     setValidationMessage("");
     setScreenHeadline(APP_COPY.idleHeadline);
-    setTimerPhase(TIMER_PHASE.IDLE);
     setPlaybackSource(null);
     setPlaybackStatus(PLAYBACK_STATUS.IDLE);
     setIsFlashing(false);
     setMediaTest(INITIAL_MEDIA_TEST);
     setShareFeedback("");
+    setAnnouncement("");
+    lastAnnouncedRef.current = null;
+    transition(() => {
+      setTimerForm(INITIAL_TIMER_FORM);
+      setTimerPhase(TIMER_PHASE.IDLE);
+    });
   }
 
   function handleSubmit(event) {
@@ -413,30 +567,46 @@ function App() {
     getChime().prime();
 
     stopPlayback({ unload: true });
-    const nextTargetTimeMs = Date.now() + (totalSeconds * 1000);
+    const durationMs = totalSeconds * 1000;
+    const nextTargetTimeMs = Date.now() + durationMs;
     setValidationMessage("");
     setPlaybackSource(resolvedPlaybackSource);
     setPlaybackStatus(PLAYBACK_STATUS.IDLE);
     setTargetTimeMs(nextTargetTimeMs);
     setPausedRemainingMs(null);
-    setDisplayTime(formatTime(totalSeconds * 1000));
+    setTotalDurationMs(durationMs);
+    setRemainingFraction(1);
+    setDisplayTime(formatTime(durationMs));
     setScreenHeadline(APP_COPY.idleHeadline);
-    setTimerPhase(TIMER_PHASE.RUNNING);
+    setAnnouncement(`Timer started. ${formatTime(durationMs)} remaining.`);
+    lastAnnouncedRef.current = null;
     setRecentTimers(saveRecentTimer(getStorage(), timerForm));
+    transition(() => setTimerPhase(TIMER_PHASE.RUNNING));
   }
 
   const screenNote = getPlaybackNote(playbackSource, playbackStatus);
   const runningEyebrow = isTimerPaused
-    ? "Timer Paused"
+    ? "Paused"
     : isTimerRunning
-      ? "Timer Running"
-      : "Timer Finished";
+      ? "On air"
+      : "Cue ready";
+
+  const showProgressRing = isTimerRunning || isTimerPaused;
 
   return (
     <main className="app-shell">
+      <div className="sr-only" role="status" aria-live="polite">{announcement}</div>
+
       {shouldShowSetup && (
         <section className="setup-card">
-          <p className="eyebrow">Timer Setup</p>
+          <header className="setup-head">
+            <div className="brand">
+              <span className="brand__mark" aria-hidden="true" />
+              <span className="brand__name">ScreenCueTime</span>
+            </div>
+            <ThemeToggle preference={themePreference} onCycle={cycleTheme} />
+          </header>
+          <p className="eyebrow">Timer setup</p>
           <h1>Fill the screen with a countdown, then trigger your song.</h1>
           <form className="timer-form" onSubmit={handleSubmit}>
             <div className="preset-row field-wide">
@@ -454,20 +624,22 @@ function App() {
                 ))}
               </div>
             </div>
-            <label className="field">
-              <span>Hours</span>
-              <input type="number" name="hours" min="0" max="23" value={timerForm.hours} onChange={handleChange} inputMode="numeric" />
-            </label>
-            <label className="field">
-              <span>Minutes</span>
-              <input type="number" name="minutes" min="0" max="59" value={timerForm.minutes} onChange={handleChange} inputMode="numeric" />
-            </label>
-            <label className="field">
-              <span>Seconds</span>
-              <input type="number" name="seconds" min="0" max="59" value={timerForm.seconds} onChange={handleChange} inputMode="numeric" />
-            </label>
+            <div className="duration-grid field-wide">
+              <label className="field">
+                <span>Hours</span>
+                <input type="number" name="hours" min="0" max="23" value={timerForm.hours} onChange={handleChange} inputMode="numeric" />
+              </label>
+              <label className="field">
+                <span>Minutes</span>
+                <input type="number" name="minutes" min="0" max="59" value={timerForm.minutes} onChange={handleChange} inputMode="numeric" />
+              </label>
+              <label className="field">
+                <span>Seconds</span>
+                <input type="number" name="seconds" min="0" max="59" value={timerForm.seconds} onChange={handleChange} inputMode="numeric" />
+              </label>
+            </div>
             <label className="field field-wide">
-              <span>Song Link</span>
+              <span>Song link</span>
               <input
                 type="url"
                 name="songLink"
@@ -479,7 +651,7 @@ function App() {
             </label>
             <div className="media-test field-wide">
               <button type="button" className="ghost-button" onClick={handleTestMedia} disabled={mediaTest.status === "testing"}>
-                {mediaTest.status === "testing" ? "Testing…" : "Test Media"}
+                {mediaTest.status === "testing" ? "Testing…" : "Test media"}
               </button>
               <p className={`media-test__status media-test__status--${mediaTest.status}`} aria-live="polite">
                 {mediaTest.message}
@@ -488,8 +660,8 @@ function App() {
             <p className="hint">Direct audio/video URLs work best. YouTube links are supported in the embedded player.</p>
             <p className="form-status" aria-live="polite">{validationMessage}</p>
             <div className="setup-actions field-wide">
-              <button type="submit" className="primary-button setup-actions__start">Start Timer</button>
-              <button type="button" className="ghost-button" onClick={handleShareLink}>Copy Shareable Link</button>
+              <button type="submit" className="primary-button setup-actions__start">Start timer</button>
+              <button type="button" className="ghost-button" onClick={handleShareLink}>Copy shareable link</button>
             </div>
             <p className="share-feedback field-wide" aria-live="polite">{shareFeedback}</p>
           </form>
@@ -519,10 +691,20 @@ function App() {
       )}
 
       {shouldShowCountdown && (
-        <section className={`countdown-screen${isFlashing ? " countdown-screen--flash" : ""}`} aria-live="polite">
-          {isFlashing && <div className="finish-flash" aria-hidden="true" />}
+        <section
+          ref={countdownRef}
+          tabIndex={-1}
+          className={[
+            "countdown-screen",
+            isFlashing ? "countdown-screen--flash" : "",
+            metaHidden ? "countdown-screen--immersive" : "",
+            isTimerFinished ? "countdown-screen--finished" : "",
+          ].filter(Boolean).join(" ")}
+        >
+          {showProgressRing && <ProgressRing remaining={remainingFraction} />}
+          {isFlashing && <div className="finish-bloom" aria-hidden="true" />}
           <div className="countdown-meta">
-            <p className="eyebrow">{runningEyebrow}</p>
+            <p className="eyebrow eyebrow--live">{runningEyebrow}</p>
             <div className="countdown-actions">
               {isTimerRunning && (
                 <button type="button" className="ghost-button" onClick={pauseCountdown}>Pause</button>
@@ -530,12 +712,18 @@ function App() {
               {isTimerPaused && (
                 <button type="button" className="ghost-button" onClick={resumeCountdown}>Resume</button>
               )}
+              {!isTimerFinished && (
+                <button type="button" className="ghost-button" onClick={toggleFullscreen}>
+                  {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                </button>
+              )}
+              <ThemeToggle preference={themePreference} onCycle={cycleTheme} />
               <button type="button" className="ghost-button" onClick={resetTimer}>Reset</button>
             </div>
           </div>
           <div className="countdown-content">
             <p className="countdown-label">{screenHeadline}</p>
-            <div className="countdown-value">{displayTime}</div>
+            <CountdownDisplay value={displayTime} />
             <p className="countdown-note">{screenNote}</p>
             {isTimerFinished && playbackSource && (
               <PlaybackPanel
