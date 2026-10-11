@@ -60,7 +60,7 @@ function App() {
   const [recentTimers, setRecentTimers] = useState([]);
   const [mediaTest, setMediaTest] = useState(INITIAL_MEDIA_TEST);
   const [shareFeedback, setShareFeedback] = useState("");
-  const [themePreference, setThemePreference] = useState(THEME.SYSTEM);
+  const [themePreference, setThemePreference] = useState(() => loadTheme(getStorage()));
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsHidden, setControlsHidden] = useState(false);
   const audioRef = useRef(null);
@@ -100,15 +100,14 @@ function App() {
     runViewTransition(() => flushSync(apply));
   }
 
-  // On first load, prefill from a shared link (if present), restore the
-  // recently-used timer history, and restore the saved theme preference.
+  // On first load, prefill from a shared link (if present) and restore the
+  // recently-used timer history. (Theme preference is restored in useState above.)
   useEffect(() => {
     const shared = decodeTimerConfig(window.location.search);
     if (shared) {
       setTimerForm((currentForm) => ({ ...currentForm, ...shared }));
     }
     setRecentTimers(loadRecentTimers(getStorage()));
-    setThemePreference(loadTheme(getStorage()));
   }, []);
 
   useEffect(() => {
