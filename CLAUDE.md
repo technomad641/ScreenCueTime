@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git workflow
+
+- The repo owner has authorized **pushing changes directly to `main`** on this repo. Commit and push directly (no pull request required) unless the owner asks for a PR or branch in a given task. Still run `npm run build` (which runs the tests) green before pushing.
+
 ## Commands
 
 - `npm run dev` — Vite dev server (usually http://localhost:5173)
